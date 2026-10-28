@@ -187,7 +187,7 @@ main{max-width:780px;margin:0 auto;padding:12px 12px 4px}
   <div class="ckf"><label for="c-obs">Observações <small>(opcional)</small></label><textarea id="c-obs" placeholder="Ex.: picanha com capa fina, bifes de 2 cm…"></textarea></div>
   <div class="ckn" id="c-note">Taxa de entrega, disponibilidade e formas de pagamento serão confirmadas pelo WhatsApp.</div>
  </div>
- <div class="ckft"><div class="ckerr" id="c-err" hidden></div><a class="ckgo" id="c-go" href="#" target="_blank" rel="noopener" onclick="return ckSend(event)">Enviar pedido no WhatsApp</a><button class="ckback" type="button" onclick="closeCk()">Voltar aos itens</button></div>
+ <div class="ckft"><div class="ckerr" id="c-err" hidden></div><button class="ckgo" id="c-go" type="button" onclick="ckEnviar()">Mandar pedido no WhatsApp</button><button class="ckback" type="button" onclick="closeCk()">Voltar aos itens</button></div>
 </div></div>
 
 <div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="Foto do produto"><button type="button" id="lbx" aria-label="Fechar">✕</button><img id="lbi" alt=""><p id="lbc"></p></div>
@@ -375,22 +375,119 @@ function buscaCep(d,i){
  getJSON(p.u(d),function(r){var o=p.m(r);if(o)aplicaCep(o);else buscaCep(d,i+1)},function(){buscaCep(d,i+1)});
 }
 function v(id){return document.getElementById(id).value.trim()}
-function ckSend(e){
+function ckValida(){
  var er=document.getElementById("c-err"),req=["c-nome","c-tel"].concat(REC?["c-cep","c-rua","c-bai","c-num"]:[]),miss=[];
  ["c-nome","c-tel","c-cep","c-rua","c-bai","c-num"].forEach(function(id){document.getElementById(id).className=""});
  req.forEach(function(id){if(!v(id)){miss.push(id);document.getElementById(id).className="bad"}});
- if(miss.length){er.textContent="Preencha os campos destacados.";er.hidden=false;document.getElementById(miss[0]).focus();e.preventDefault();return false}
- var dg=v("c-tel").replace(/\D/g,"");
- if(dg.length<10){document.getElementById("c-tel").className="bad";er.textContent="Telefone incompleto. Use DDD + número.";er.hidden=false;document.getElementById("c-tel").focus();e.preventDefault();return false}
- er.hidden=true;
+ if(miss.length){er.textContent="Preencha os campos destacados.";er.hidden=false;document.getElementById(miss[0]).focus();return false}
+ if(v("c-tel").replace(/\D/g,"").length<10){document.getElementById("c-tel").className="bad";er.textContent="Telefone incompleto. Use DDD + número.";er.hidden=false;document.getElementById("c-tel").focus();return false}
+ er.hidden=true;return true;
+}
+function ckTexto(){
  var m="*Olá, "+NAME+"! Gostaria de fazer um pedido:*\n\n"+LINES.join("\n\n")+"\n\nTotal estimado: "+brl(TOT)+"\n\n*"+(REC?"Entrega":"Retirada na loja")+"*\n• *Nome:* "+v("c-nome")+"\n• *Telefone:* "+v("c-tel");
  if(REC){m+="\n• *Endereço:* "+v("c-rua")+", "+v("c-num")+" – "+v("c-bai")+(CID?"\n• *Cidade:* "+CID:"")+"\n• *CEP:* "+v("c-cep");if(v("c-comp"))m+="\n• *Complemento:* "+v("c-comp")}
  if(v("c-obs"))m+="\n• *Observações:* "+v("c-obs");
- m+="\n\nPodem confirmar a disponibilidade?";
- document.getElementById("c-go").href="https://wa.me/"+PHONE+"?text="+encodeURIComponent(m);
- return true;
+ return m+"\n\nPodem confirmar a disponibilidade?";
 }
-document.getElementById("ck").addEventListener("click",function(e){if(e.target.id=="ck")closeCk()});
+
+/* ---- comanda em foto ---- */
+function wrap(x,s,max){
+ var w=String(s).split(" "),l=[],c="";
+ for(var i=0;i<w.length;i++){var tst=c?c+" "+w[i]:w[i];if(x.measureText(tst).width>max&&c){l.push(c);c=w[i]}else c=tst}
+ if(c)l.push(c);return l;
+}
+function comandaCanvas(){
+ var W=900,PAD=48,c=document.createElement("canvas");c.width=W;c.height=4000;
+ var x=c.getContext("2d"),ink="#241a17",mut="#7b6a62",red="#9e1620";
+ x.fillStyle="#fbf7f2";x.fillRect(0,0,W,4000);
+ x.textBaseline="top";
+ /* cabeçalho */
+ x.fillStyle=red;x.fillRect(0,0,W,206);
+ var lg=document.querySelector(".logo");
+ try{if(lg&&lg.complete){x.save();x.beginPath();x.arc(PAD+72,103,72,0,6.2832);x.closePath();x.clip();x.drawImage(lg,PAD,31,144,144);x.restore();
+  x.strokeStyle="#fff";x.lineWidth=4;x.beginPath();x.arc(PAD+72,103,72,0,6.2832);x.stroke()}}catch(e){}
+ x.fillStyle="#fff";x.font="700 40px system-ui,Arial,sans-serif";x.fillText("AÇOUGUE BOM BEEF",PAD+176,62);
+ x.fillStyle="#f0d9a0";x.font="700 27px system-ui,Arial,sans-serif";x.fillText("A L P H A V I L L E",PAD+180,112);
+ var y=206+38;
+ /* título */
+ var d=new Date(),z=function(n){return(n<10?"0":"")+n};
+ x.fillStyle=red;x.font="700 31px system-ui,Arial,sans-serif";x.fillText("COMANDA DE PEDIDO",PAD,y);
+ x.fillStyle=mut;x.font="24px system-ui,Arial,sans-serif";x.textAlign="right";
+ x.fillText(z(d.getDate())+"/"+z(d.getMonth()+1)+"/"+d.getFullYear()+"  "+z(d.getHours())+":"+z(d.getMinutes()),W-PAD,y+4);
+ x.textAlign="left";y+=54;
+ x.fillStyle="#e3d7cb";x.fillRect(PAD,y,W-PAD*2,2);y+=30;
+ /* itens */
+ x.fillStyle=mut;x.font="700 20px system-ui,Arial,sans-serif";x.fillText("ITENS DO PEDIDO",PAD,y);y+=38;
+ P.forEach(function(p){
+  var q=Q[p.id]||0;if(!q)return;
+  var sub=brl(q*p.pr);
+  x.font="700 30px system-ui,Arial,sans-serif";x.textAlign="right";
+  var pw=x.measureText(sub).width;
+  x.fillStyle=ink;x.font="700 28px system-ui,Arial,sans-serif";x.textAlign="left";
+  var ls=wrap(x,p.n,W-PAD*2-pw-30),y0=y;
+  ls.forEach(function(s){x.fillText(s,PAD,y);y+=36});
+  x.fillStyle=mut;x.font="23px system-ui,Arial,sans-serif";
+  x.fillText(qt(p,q)+"  ×  "+brl(p.pr)+" / "+(p.unit?"un":"kg")+(p.opts?"   ·   queijo "+selOf(p):""),PAD,y);y+=34;
+  x.fillStyle=red;x.font="700 30px system-ui,Arial,sans-serif";x.textAlign="right";x.fillText(sub,W-PAD,y0+2);x.textAlign="left";
+  y+=14;x.fillStyle="#eadfd4";x.fillRect(PAD,y,W-PAD*2,1);y+=22;
+ });
+ /* total */
+ y+=6;x.fillStyle="#f3e8dc";x.fillRect(PAD,y,W-PAD*2,94);
+ x.fillStyle=mut;x.font="700 22px system-ui,Arial,sans-serif";x.fillText("TOTAL ESTIMADO",PAD+26,y+20);
+ x.fillStyle=red;x.font="700 44px system-ui,Arial,sans-serif";x.textAlign="right";x.fillText(brl(TOT),W-PAD-26,y+34);x.textAlign="left";
+ y+=94+40;
+ /* dados */
+ x.fillStyle=red;x.font="700 26px system-ui,Arial,sans-serif";x.fillText(REC?"ENTREGA":"RETIRADA NA LOJA",PAD,y);y+=42;
+ var campos=[["Nome",v("c-nome")],["Telefone",v("c-tel")]];
+ if(REC){campos.push(["Endereço",v("c-rua")+", "+v("c-num")+" – "+v("c-bai")]);if(CID)campos.push(["Cidade",CID]);campos.push(["CEP",v("c-cep")]);if(v("c-comp"))campos.push(["Complemento",v("c-comp")])}
+ if(v("c-obs"))campos.push(["Observações",v("c-obs")]);
+ campos.forEach(function(f){
+  x.fillStyle=mut;x.font="700 23px system-ui,Arial,sans-serif";
+  var lw=x.measureText(f[0]+": ").width;x.fillText(f[0]+": ",PAD,y);
+  x.fillStyle=ink;x.font="25px system-ui,Arial,sans-serif";
+  var ls=wrap(x,f[1],W-PAD*2-lw);
+  ls.forEach(function(s,i){x.fillText(s,i?PAD:PAD+lw,y);y+=i||ls.length>1?34:0});
+  if(ls.length<2)y+=36;else y+=6;
+ });
+ y+=22;x.fillStyle="#e3d7cb";x.fillRect(PAD,y,W-PAD*2,2);y+=22;
+ x.fillStyle=mut;x.font="21px system-ui,Arial,sans-serif";
+ x.fillText("Pedido gerado pelo site. Peso e valores confirmados no atendimento.",PAD,y);y+=30;
+ x.fillText("Açougue Bom Beef Alphaville  ·  WhatsApp (11) 2690-6895",PAD,y);y+=46;
+ /* corta na altura usada */
+ var h=Math.min(y,4000),f=document.createElement("canvas");f.width=W;f.height=h;
+ f.getContext("2d").drawImage(c,0,0);
+ return f;
+}
+function duFile(du,nome){
+ var p=du.split(","),bin=atob(p[1]),n=bin.length,u=new Uint8Array(n);
+ while(n--)u[n]=bin.charCodeAt(n);
+ return new File([u],nome,{type:"image/png"});
+}
+var SAUD="*Olá, Bom Beef Alphaville! Gostaria de fazer um pedido:*";
+function zap(txt){window.open("https://wa.me/"+PHONE+"?text="+encodeURIComponent(txt),"_blank")}
+function baixaEzap(cv){
+ try{
+  var a=document.createElement("a");a.href=cv.toDataURL("image/png");a.download="pedido-bom-beef.png";
+  document.body.appendChild(a);a.click();a.remove();
+  toast("Comanda salva no aparelho");
+ }catch(e){}
+ setTimeout(function(){zap(ckTexto())},700);
+}
+function ckEnviar(){
+ if(!ckValida())return;
+ var cv=null,file=null;
+ try{cv=comandaCanvas();file=duFile(cv.toDataURL("image/png"),"pedido-bom-beef.png")}catch(e){}
+ if(file&&navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+  try{
+   navigator.share({files:[file],text:SAUD}).then(function(){closeCk()}).catch(function(err){
+    if(err&&(err.name=="AbortError"||err.name=="NotAllowedError"))return;
+    baixaEzap(cv);
+   });
+   return;
+  }catch(e){}
+ }
+ if(cv)baixaEzap(cv);else zap(ckTexto());
+}
 /* ---- início ---- */
 try{var s=JSON.parse(localStorage.getItem("bbalpha")||"null");if(s)P.forEach(function(p){if(s.Q&&s.Q[p.id]&&!p.out)Q[p.id]=s.Q[p.id];if(s.SEL&&s.SEL[p.id])SEL[p.id]=s.SEL[p.id]})}catch(e){}
 OPEN["Cortes Bovinos"]=true;
