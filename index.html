@@ -119,6 +119,8 @@ main{max-width:780px;margin:0 auto;padding:12px 12px 4px}
 .ckf input,.ckf textarea{width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--line);background:rgba(255,255,255,.06);color:var(--ink);font:16px system-ui,sans-serif}
 .ckf input:focus,.ckf textarea:focus{outline:none;border-color:var(--red)}
 .ckf input.bad{border-color:#ff6b6b;background:rgba(255,80,80,.09)}
+.cepmsg{margin-top:6px;font-size:12px;color:var(--mute);min-height:1px}
+.cepmsg.err{color:#ff8b82}
 .ckf textarea{min-height:64px;resize:vertical}
 .ckr{display:grid;grid-template-columns:minmax(0,1fr) 108px;gap:10px}
 .rad{display:grid;grid-template-columns:1fr 1fr;gap:9px}
@@ -174,9 +176,10 @@ main{max-width:780px;margin:0 auto;padding:12px 12px 4px}
  <div class="ckc">
   <div class="cks" id="cks"></div>
   <div class="ckf"><label for="c-nome">Nome</label><input id="c-nome" type="text" autocomplete="name"></div>
-  <div class="ckf"><label for="c-tel">Telefone</label><input id="c-tel" type="tel" inputmode="tel" autocomplete="tel" placeholder="(11) 90000-0000"></div>
+  <div class="ckf"><label for="c-tel">Telefone</label><input id="c-tel" type="tel" inputmode="numeric" autocomplete="tel" maxlength="16" placeholder="(11) 95742-3012" oninput="fmtTel(this)"></div>
   <div class="ckf"><label>Como prefere receber?</label><div class="rad" id="c-rec"><button type="button" class="on" onclick="rec(1)"><i></i>Entrega</button><button type="button" onclick="rec(0)"><i></i>Retirada na loja</button></div></div>
   <div id="c-end">
+   <div class="ckf"><label for="c-cep">CEP</label><input id="c-cep" type="text" inputmode="numeric" autocomplete="postal-code" maxlength="9" placeholder="06454-000" oninput="fmtCep(this)"><div class="cepmsg" id="c-cepmsg"></div></div>
    <div class="ckf"><label for="c-rua">Endereço</label><input id="c-rua" type="text" autocomplete="address-line1" placeholder="Rua / avenida"></div>
    <div class="ckr"><div class="ckf"><label for="c-bai">Bairro</label><input id="c-bai" type="text"></div><div class="ckf"><label for="c-num">Número</label><input id="c-num" type="text" inputmode="numeric"></div></div>
    <div class="ckf"><label for="c-comp">Complemento <small>(opcional)</small></label><input id="c-comp" type="text" placeholder="Apto, bloco, condomínio…"></div>
@@ -212,7 +215,7 @@ var P=[
  {id:"sho-fsw",g:"Cortes Bovinos",n:"Short Rib FSW (Acém)",t:"Fazenda Recreio · Reserva",pr:129.99,k:"chorizo",prem:0,min:0.4,step:0.1},
  {id:"flat-bb",g:"Cortes Bovinos",n:"Flat Iron Bom Beef",t:"Congelado · Bom Beef",pr:195.95,k:"chorizo",prem:0,min:0.4,step:0.1},
  {id:"bom-alc",g:"Cortes Bovinos",n:"Bombom da Alcatra by Netão",t:"Reserva Especial · Best Beef",pr:145.90,k:"picanha",prem:1,min:1,step:0.2},
- {id:"ban-grl",g:"Cortes Bovinos",n:"Bananinha Linha Grill",t:"Linha Grill · Bom Beef",pr:126.90,k:"chorizo",prem:0,min:1,step:0.2},
+ {id:"ban-grl",g:"Cortes Bovinos",n:"Bananinha Linha Grill",t:"Linha Grill · Bom Beef · peças de ~500 g",pr:126.90,k:"chorizo",prem:0,min:0.5,step:0.1},
  {id:"lin-par",g:"Linguiças",n:"Linguiça Rúcula e Parmesão",t:"Specialli · 400 g",pr:39.90,k:"chorizo",prem:0,unit:1},
  {id:"lin-cos",g:"Linguiças",n:"Linguiça Costelinha BBQ",t:"Specialli · 400 g",pr:39.90,k:"chorizo",prem:0,unit:1},
  {id:"lin-tex",g:"Linguiças",n:"Linguiça Tex Mex",t:"Specialli · 400 g",pr:45.90,k:"chorizo",prem:0,unit:1},
@@ -337,16 +340,52 @@ function fillCk(){
 }
 function openCk(){if(!LINES.length){toast("Escolha seus produtos primeiro");return}fillCk();document.getElementById("c-err").hidden=true;document.getElementById("ck").className="ck on";try{document.body.style.overflow="hidden"}catch(e){}}
 function closeCk(){document.getElementById("ck").className="ck";try{document.body.style.overflow=""}catch(e){}}
+function fmtTel(el){var d=el.value.replace(/\D/g,"");if(d.length>11&&d.slice(0,2)=="55")d=d.slice(2);d=d.slice(0,11);var o="";
+ if(d.length)o="("+d.slice(0,2);
+ if(d.length>2)o+=") "+(d.length>10?d.slice(2,7)+"-"+d.slice(7):d.slice(2,6)+(d.length>6?"-"+d.slice(6):""));
+ el.value=o}
+var CID="";
+function cepMsg(s,err){var h=document.getElementById("c-cepmsg");h.textContent=s||"";h.className="cepmsg"+(err?" err":"")}
+function fmtCep(el){
+ var d=el.value.replace(/\D/g,"").slice(0,8);el.value=d.length>5?d.slice(0,5)+"-"+d.slice(5):d;
+ if(d.length==8)buscaCep(d);else{CID="";cepMsg("")}
+}
+var CEPAPI=[
+ {u:function(d){return "https://viacep.com.br/ws/"+d+"/json/"},m:function(r){return r&&!r.erro&&(r.logradouro||r.localidade)?{rua:r.logradouro,bai:r.bairro,cid:r.localidade,uf:r.uf}:null}},
+ {u:function(d){return "https://brasilapi.com.br/api/cep/v2/"+d},m:function(r){return r&&(r.street||r.city)?{rua:r.street,bai:r.neighborhood,cid:r.city,uf:r.state}:null}},
+ {u:function(d){return "https://opencep.com/v1/"+d},m:function(r){return r&&(r.logradouro||r.localidade)?{rua:r.logradouro,bai:r.bairro,cid:r.localidade,uf:r.uf}:null}}
+];
+function getJSON(u,ok,err){
+ try{var x=new XMLHttpRequest();x.open("GET",u,true);x.timeout=7000;
+  x.onload=function(){var r=null;try{r=JSON.parse(x.responseText)}catch(e){}ok(r)};
+  x.onerror=function(){err()};x.ontimeout=function(){err()};x.send()}catch(e){err()}
+}
+function aplicaCep(o){
+ var ru=document.getElementById("c-rua"),ba=document.getElementById("c-bai"),nu=document.getElementById("c-num");
+ if(o.rua){ru.value=o.rua;ru.className=""}
+ if(o.bai){ba.value=o.bai;ba.className=""}
+ CID=(o.cid||"")+(o.uf?" / "+o.uf:"");
+ cepMsg(CID?"\u{1F4CD} "+CID:"");
+ if(o.rua&&!nu.value)try{nu.focus()}catch(e){}
+}
+function buscaCep(d,i){
+ i=i||0;if(!i)cepMsg("Buscando endereço…");
+ if(i>=CEPAPI.length){CID="";cepMsg("Não consegui buscar o CEP. Preencha abaixo.",1);return}
+ var p=CEPAPI[i];
+ getJSON(p.u(d),function(r){var o=p.m(r);if(o)aplicaCep(o);else buscaCep(d,i+1)},function(){buscaCep(d,i+1)});
+}
 function v(id){return document.getElementById(id).value.trim()}
 function ckSend(e){
- var er=document.getElementById("c-err"),req=["c-nome","c-tel"].concat(REC?["c-rua","c-bai","c-num"]:[]),miss=[];
- ["c-nome","c-tel","c-rua","c-bai","c-num"].forEach(function(id){document.getElementById(id).className=""});
+ var er=document.getElementById("c-err"),req=["c-nome","c-tel"].concat(REC?["c-cep","c-rua","c-bai","c-num"]:[]),miss=[];
+ ["c-nome","c-tel","c-cep","c-rua","c-bai","c-num"].forEach(function(id){document.getElementById(id).className=""});
  req.forEach(function(id){if(!v(id)){miss.push(id);document.getElementById(id).className="bad"}});
  if(miss.length){er.textContent="Preencha os campos destacados.";er.hidden=false;document.getElementById(miss[0]).focus();e.preventDefault();return false}
+ var dg=v("c-tel").replace(/\D/g,"");
+ if(dg.length<10){document.getElementById("c-tel").className="bad";er.textContent="Telefone incompleto. Use DDD + número.";er.hidden=false;document.getElementById("c-tel").focus();e.preventDefault();return false}
  er.hidden=true;
- var m="*Olá, "+NAME+"! Gostaria de fazer um pedido:*\n\n"+LINES.join("\n")+"\n\nTotal estimado: "+brl(TOT)+"\n\n*"+(REC?"Entrega":"Retirada na loja")+"*\n• Nome: "+v("c-nome")+"\n• Telefone: "+v("c-tel");
- if(REC){m+="\n• Endereço: "+v("c-rua")+", "+v("c-num")+" – "+v("c-bai");if(v("c-comp"))m+="\n• Complemento: "+v("c-comp")}
- if(v("c-obs"))m+="\n• Observações: "+v("c-obs");
+ var m="*Olá, "+NAME+"! Gostaria de fazer um pedido:*\n\n"+LINES.join("\n\n")+"\n\nTotal estimado: "+brl(TOT)+"\n\n*"+(REC?"Entrega":"Retirada na loja")+"*\n• *Nome:* "+v("c-nome")+"\n• *Telefone:* "+v("c-tel");
+ if(REC){m+="\n• *Endereço:* "+v("c-rua")+", "+v("c-num")+" – "+v("c-bai")+(CID?"\n• *Cidade:* "+CID:"")+"\n• *CEP:* "+v("c-cep");if(v("c-comp"))m+="\n• *Complemento:* "+v("c-comp")}
+ if(v("c-obs"))m+="\n• *Observações:* "+v("c-obs");
  m+="\n\nPodem confirmar a disponibilidade?";
  document.getElementById("c-go").href="https://wa.me/"+PHONE+"?text="+encodeURIComponent(m);
  return true;
